@@ -1,0 +1,915 @@
+#pragma version 3
+
+// Slots:
+// 1: asset1_balance
+// 3: asset2_balance
+// 4: issued_liquidity_tokens
+// 6: liquidity_token_balance
+// 7: calculated_liquidity_token_out
+// 16: calculated_asset1_out
+// 17: calculated_asset2_out
+// 18: input_suppply
+// 19: output_supply
+// 20: calculated_amount_out
+// 21: calculated_amount_in
+// 42: protocol_fee_liquidity_tokens
+// 52: gtxn_2_amount
+// 53: gtxn_3_amount
+// 61: outstanding_asset1_amount
+// 62: outstanding_asset2_amount
+// 63: outstanding_liquidity_token
+// 64: unclaimed_protocol_fee_token_amount
+// 100: is_asset_in_asset1
+// 101: asset1_id
+// 102: asset2_id
+// 103: liquidity_token_id
+// 111: outstanding_asset1_key
+// 112: outstanding_asset2_key
+// 113: outstanding_liquidity_token_key
+// 121: excess_asset1_key
+// 122: excess_asset2_key
+// 123: excess_liquidity_token_key
+// 201: excess_asset_1
+// 202: excess_asset_2
+// 203: excess_liquidity_token
+
+
+// Deny Update, Delete, CloseOut
+txn OnCompletion
+int UpdateApplication
+==
+txn OnCompletion
+int DeleteApplication
+==
+||
+txn OnCompletion
+int CloseOut
+==
+||
+bnz fail
+
+// Pooler/Swapper Optin
+txn OnCompletion
+int OptIn
+==
+txn NumAppArgs
+int 0
+==
+&&
+bnz success
+
+// Create
+txna ApplicationArgs 0
+byte "c" // create
+==
+bnz success
+
+// Pool Optin & Bootstrap
+txn OnCompletion
+int OptIn
+==
+txna ApplicationArgs 0
+byte "bs" // bootstrap
+==
+&&
+bnz bootstrap
+
+
+// Common normalisation used in many places for the remaining operations
+gtxn 2 AssetAmount // asset amount
+gtxn 2 Amount // or algo amount
++
+store 52 // gtxn_2_amount
+
+
+int 0
+byte "a1" // asset1 key
+app_local_get // get asset1 id
+store 101 // asset1_id
+
+int 0
+load 101 // asset1_id
+asset_holding_get AssetBalance // get asset1 balance
+pop // discard exists flag 
+store 1 // store asset1_balance
+
+int 0
+byte "a2" // asset2 key
+app_local_get // get asset2 id
+store 102 // asset2_id
+
+// calculate and store asset2_balance
+int 0
+balance // algo balance
+int 0
+min_balance // min balance
+-
+txn Fee
++
+gtxn 0 Amount
+- // ((balance - min_balance) + fee) - gtxn0 amount
+
+int 0
+load 102 // asset2_id
+asset_holding_get AssetBalance
+pop // discard exists flag
+load 102 // asset2_id
+select // if asset2_id != 0, AssetBalance else Algo balance
+store 2 // store asset2_balance
+
+
+// liquidity_token_id
+int 0
+byte "lt" // liquidity_token key
+app_local_get // get liquidity_token id
+store 103 // liquidity_token_id
+
+
+// outstanding_asset1_key
+byte "o"
+load 101 // asset1ID
+itob
+concat
+store 111 // outstanding_asset1_key
+
+// load outstanding asset 1 from Pool account state
+int 0
+load 111 // outstanding_asset1_key
+app_local_get // outstanding_asset1_amount
+store 61
+
+// outstanding_asset2_key
+byte "o"
+load 102 // asset2ID
+itob
+concat
+store 112 // outstanding_asset2_key
+
+// load outstanding asset 2 from Pool account state
+int 0
+load 112 // outstanding_asset1_key
+app_local_get // outstanding_asset2_amount
+store 62
+
+
+// outstanding_liquidity_token_key
+byte "o"
+load 103 // liquidity_token_id
+itob
+concat
+store 113 // outstanding_liquidity_token_key
+
+// load outstanding liquidity token from Pool account state
+int 0
+load 113 // outstanding_liquidity_token_key
+app_local_get // outstanding_liquidity_token_amount
+store 63
+
+// load unclaimed_protocol_fee_token_amount from Pool account state
+int 0
+byte "p" // unclaimed_protocol_fee_token_key
+app_local_get // unclaimed_protocol_fee_token_amount
+store 64 // unclaimed_protocol_fee_token_amount
+
+
+// excess_asset1_key
+txn Sender
+byte "e"
+concat
+load 101 // asset1ID
+itob
+concat
+store 121 // excess_asset1_key
+
+// excess_asset2_key
+txn Sender
+byte "e"
+concat
+load 102 // asset2ID
+itob
+concat
+store 122 // excess_asset2_key
+
+
+// excess_liquidity_token_key
+txn Sender
+byte "e"
+concat
+load 103 // liquidity_token_id
+itob
+concat
+store 123 // excess_liquidity_token_key
+
+// Redeem
+txna ApplicationArgs 0
+byte "r" // redeem
+==
+bnz redeem
+
+// Redeem Fees
+txna ApplicationArgs 0
+byte "f" // fees
+==
+bnz redeem_fees
+
+// Swap/Mint/Burn
+txna ApplicationArgs 0
+byte "s" // swap
+==
+txna ApplicationArgs 0
+byte "m" //mint
+==
+||
+txna ApplicationArgs 0
+byte "b" //burn
+==
+||
+bnz swap_mint_burn
+
+
+// else
+err
+
+
+// Redeem Fees
+redeem_fees:
+    load 103 // liquidity_token_id
+    dup
+    assert
+    gtxn 2 XferAsset
+    == // ensure the asset in gtxn2 really is the liquidity token
+    assert
+
+    gtxn 2 AssetReceiver
+    global CreatorAddress
+    == // only the creator (of the validator app) can reedem fees
+    assert
+
+    // outstanding_liquidity_token_amount -= redeemed_token_amount
+    load 63 // outstanding_liquidity_token_amount
+    gtxn 2 AssetAmount // redeemed_token_amount
+    -
+    store 63
+
+    // unclaimed_protocol_fee_token_amount -= redeemed_token_amount
+    load 64 // unclaimed_protocol_fee_token_amount
+    gtxn 2 AssetAmount // redeemed_token_amount
+    // NOTE: This operation (-) will cause an error if redeeming amount is > unclaimed_protocol_fee_token_amount
+    -
+    store 64
+    b update_local_state
+
+// Redeem
+redeem:
+    // ensure reedeming amount > 0
+    load 52 // gtxn_2_amount
+    assert
+
+    // update value of outstanding_asset_i in local state of Pool account
+    // outstanding_asset_i_amount = outstanding_asset_i_amount - redeeming_amount
+    int 0 // account 0, Pool account
+    byte "o" // 'o'
+    gtxn 2 XferAsset
+    itob
+    concat // key = 'o' + assetID
+    dup2 // duplicate 0 and key for use with app_local_put below
+    app_local_get // current outstanding asset
+    load 52 // gtxn_2_amount
+    - // outstanding_asset_amount - redeeming_amount
+    app_local_put // store outstanding asset amount in Pool account
+
+    // update value of excess_asset_i in local state of Swapper/Pooler account
+    // excess_asset_i_amount = excess_asset_i_amount - redeeming_amount
+    int 1
+    txn Sender
+    byte "e" // 'e'
+    concat // pool_address + 'e'
+    gtxn 2 XferAsset
+    itob
+    concat // key = pool_address + 'e' + assetID
+    dup2  // duplicate 1 and key for use with app_local_put below
+    app_local_get
+    load 52 // gtxn_2_amount
+    // NOTE: This operation (-) will cause an error if redeeming amount is > excess_asset_i_amount
+    - // excess_asset_i_amount - redeeming_amount
+    dup
+    bz redeem__zero_excess
+        app_local_put // store excess asset amount in User account if it is > 0
+        int 1
+        return
+    redeem__zero_excess:
+        pop // pop the 0 amount
+        app_local_del // delete the local state for excess amount
+        int 1
+        return
+
+swap_mint_burn:
+
+    gtxn 3 AssetAmount // asset amount
+    gtxn 3 Amount // or algo amount
+    +
+    store 53 // gtxn_3_amount
+
+    txna Accounts 1
+    txn Sender
+    !=
+    assert
+
+    // if liquidity_token_id is 0 it means it hasn't been set yet so this must be before first mint
+    load 103 // liquidity_token_id
+    bz mint_burn__1
+
+    // get liquidity_token_balance
+    int 0
+    load 103
+    asset_holding_get AssetBalance
+    pop
+    store 6 // liquidity_token_balance
+
+    // calculate issued liquidity
+    int 0
+    ~ // TOTAL_LIQUIDITY
+    load 6 // liquidity_token_balance
+    - // TOTAL_LIQUIDITY - liquidity_token_balance
+    load 63 // outstanding_liquidity_token_amount
+    + // (TOTAL_LIQUIDITY - liquidity_token_balance) + outstanding_liquidity_token_amount
+    store 4 // issued_liquidity_tokens
+
+
+    txna ApplicationArgs 0
+    byte "s" // 'swap'
+    ==
+    bnz swap
+
+    // ensure the asset in gtxn4 really is the liquidity token
+    load 103
+    gtxn 4 XferAsset
+    == 
+    assert
+
+mint_burn__1:
+
+    // Mint
+    txna ApplicationArgs 0
+    byte "m" // 'mint'
+    ==
+    bnz mint
+
+// Burn
+
+// TODO: Refactor code to factor out burn proportion (burn_amount / issued_liquidity_tokens)
+
+// burn_amount = gtxn 4 AssetAmount
+// asset1_amount = gtxn 2 AssetAmount
+// asset2_amount = gtxn 3 AssetAmount
+
+// calculated_asset1_out = asset1_supply * (burn_amount / issued_liquidity_tokens)
+// calculated_asset2_out = asset2_supply * (burn_amount / issued_liquidity_tokens)
+
+// excess_asset_1 = calculated_asset1_out - asset1_out
+// excess_asset_2 = calculated_asset2_out - asset2_out
+// # if the excess amount is negative an error will occur
+
+
+// # record outstanding assets in Pool account state
+// outstanding_asset1_amount +=  excess_asset_1
+// outstanding_asset2_amount +=  excess_asset_2
+
+// # record excess assets in Pooler account state
+// excess_asset1_amount += excess_asset_1
+// excess_asset2_amount += excess_asset_2
+
+// burn
+    gtxn 4 AssetAmount // burn_amount
+    // calculate asset1_supply
+    load 1 // asset1_balance
+    load 61 // outstanding_asset1_amount
+    - // asset1_supply
+    * // burn_amount * asset1_supply
+    load 4 // issued_liquidity_tokens
+    /  // (burn_amount * asset1_supply) / issued_liquidity_tokens
+    dup // calculated_asset1_out
+    store 16 // calculated_asset1_out
+    load 52 // gtxn 2 AssetAmount
+    // Note: the next line will fail if asset1_out > calculated_asset1_out
+    - // excess_asset_1 = calculated_asset1_out - asset1_out
+    store 201 // excess_asset_1
+
+
+    gtxn 4 AssetAmount // burn_amount
+    // calculate asset2_supply
+    load 2 // asset2_balance
+    load 62 // outstanding_asset2_amount
+    - // asset2_supply
+    * // burn_amount * asset1_supply
+    load 4 // issued_liquidity_tokens
+    / // (burn_amount * asset2_supply) / issued_liquidity_tokens
+    dup
+    store 17 // calculated_asset2_out
+    load 53 // gtxn_3_amount ASA or Algo asset2_out
+    // Note: the next line will fail if asset2_out > calculated_asset2_out
+    - // excess_asset_2 = calculated_asset2_out - asset2_out
+    store 202 // excess_asset_2
+
+    // ensure the calculated amounts are not 0
+    load 16
+    load 17
+    &&
+    assert
+    b update_local_state
+
+
+// Mint
+// asset1_amount = gtxn 2 AssetAmount
+// asset2_amount = gtxn 3 AssetAmount
+// liquidity_token_amount = gtxn 4 AssetAmount 
+
+
+// if first minting:
+// 	assert(liquidity_token_amount + MINIMUM_LIQUIDITY <= sqrt(asset1_amount * asset2_amount))
+// 	# lock up the first MINIMUM_LIQUIDITY tokens
+// 	put outstanding_liquidity_token_amount = MINIMUM_LIQUIDITY
+// 	calculated_liquidity_token_out = liquidity_token_amount
+// else:
+// 	calculated_liquidity_token_out = Min(
+// 		asset1_amount * issued_liquidity_tokens / asset1_supply,
+// 		asset2_amount * issued_liquidity_tokens / asset2_supply
+// 	)
+
+
+// excess_liquidity_token = calculated_liquidity_token_out - liquidity_token_amount
+// # record outstanding liquidity in Pool account state
+// put outstanding_liquidity_token_amount += excess_liquidity_token
+// # record excess liquidity in Pooler account state
+// put excess_liquidity_token_amount += excess_liquidity_token
+
+mint:
+    load 4 // issued_liquidity_tokens
+    int 0
+    ==  // is it first minting?
+    bnz mint__first_minting
+
+    // subsequent minting:
+    load 52 // gtxn_2_amount
+    load 4 // issued_liquidity_tokens
+    // TODO: Use mulw and TEAL4 divmodw here
+    * // asset1_amount * issued_liquidity_tokens
+    load 1 // asset1_balance
+    load 61 // outstanding_asset1_amount
+    - // asset1_supply
+    / // asset1_amount * issued_liquidity_tokens / asset1_supply
+    // A
+
+    load 53 // gtxn_3_amount
+    load 4 // issued_liquidity_tokens
+    // TODO: Use mulw and TEAL4 divmodw here
+    * // asset2_amount * issued_liquidity_tokens
+    load 2 // asset2_balance
+    load 62 // outstanding_asset2_amount
+    - // asset2_supply
+    / // asset2_amount * issued_liquidity_tokens / asset2_supply
+    // B
+
+    // Min(A, B)
+    dup2
+    // A
+    // B
+    > // A > B
+    select // B
+    // calculated_liquidity_token_out = Min(A, B)
+
+    gtxn 4 AssetAmount // liquidity_token_amount
+    - // excess_liquidity_token
+    store 203 // excess_liquidity_token
+    b update_local_state
+
+    mint__first_minting:
+    // minted_liquidity_token = liquidity_token_amount + MINIMUM_LIQUIDITY
+    // assert(minted_liquidity_token <= sqrt(asset1_amount * asset2_amount))
+    // Same as:
+    // assert((minted_liquidity_token * minted_liquidity_token) <= (asset1_amount * asset2_amount))
+
+    // the liquidity_token_id is not in local state at this point
+    // put the liquidity_token_id in a scratch slot & the Pool local state
+    int 0
+    byte "lt" // 'lt' liquidity token
+    gtxn 4 XferAsset
+    dup
+    store 103 // liquidity_token_id
+    app_local_put // liquidity_token_id
+
+    byte "o"
+    load 103 // liquidity_token_id
+    itob
+    concat
+    store 113 // outstanding_liquidity_token_key
+
+    // ensure gtxn 4 XferAsset (slot 103) is really the liquidity token
+    // ensure the Pool holds it
+    int 0
+    load 103 // liquidity_token_id
+    asset_holding_get AssetBalance // liquidity_token_balance
+    pop
+    assert
+
+    // ensure it is NOT asset1
+    // gtxn 4 XferAsset on stack
+    load 103 // liquidity_token_id
+    load 101 // asset1_id
+    !=
+    assert
+
+    // ensure it is NOT asset2
+    load 103 // liquidity_token_id
+    load 102 // asset2_id
+    !=
+    assert
+
+    // assert minted_liquidity_token * minted_liquidity_token <= asset1_amount * asset2_amount
+    gtxn 4 AssetAmount // liquidity_token_amount
+    int 1000 // MINIMUM_LIQUIDITY
+    + // minted_liquidity_token
+    dup
+    mulw // minted_liquidity_token * minted_liquidity_token
+    store 240 // store minted_squared_lo, leave high on stack
+
+    load 52 // gtxn 2 AssetAmount: asset1_amount
+    load 53 // gtxn_3_amount: assset2_amount
+    mulw // asset1_amount * asset2_amount
+    store 241 // store amount_product_lo, leave high on stack
+    dup2
+    < // compare highs
+    // if minted_squared_hi < amount_product_hi no need to check lows
+    bnz mint__first_minting_1
+    ==
+    load 240 // minted_squared_lo
+    load 241 // amount_product_lo
+    <= // compare lows: minted_squared_lo <= amount_product_lo
+    &&
+    assert
+
+    mint__first_minting_1:
+    // lock up the first MINIMUM_LIQUIDITY tokens
+    int 1000
+    store 63 // outstanding_liquidity_token_amount
+
+    b update_local_state
+// End Mint
+
+
+
+// Swap
+	// if fixed input:
+	// 	calculated_amount_out = (asset_in_amount * 997 * output_supply) / 
+	// 	((input_supply * 1000) + (asset_in_amount * 997))
+
+
+	// 	excess_asset_out = calculated_amount_out - asset_out_amount
+	// 	# record outstanding asset out amount in Pool state
+	// 	put outstanding_asset_out_amount += excess_asset_out
+
+	// 	# record excess asset out amount in Pooler state
+	// 	put excess_asset_out_amount += excess_asset_out
+
+	// 	# ensure calculated_amount_out > 0
+	// 	# ensure calculated_amount_out < output_supply
+
+	// else:
+
+	// 	calculated_amount_in = ((asset_out_amount * input_suppply * 1000) / 
+	// 	((output_supply - asset_out_amount) * 997)) + 1
+
+	// 	excess_asset_in = asset_in_amount - calculated_amount_in
+	// 	# record outstanding asset in amount in Pool state
+	// 	put outstanding_asset_in_amount += excess_asset_in
+
+	// 	# record excess asset in amount in Pooler state
+	// 	put excess_asset_in_amount += excess_asset_in
+
+	// 	# ensure calculated_amount_in > 0
+	// 	# ensure asset_out_amount < output_supply
+
+
+
+
+swap:
+    // Is asset_in == asset1 and asset_out == asset2? 
+    gtxn 2 XferAsset
+    load 101 // asset1_id
+    ==
+    gtxn 3 XferAsset
+    load 102 // asset2_id
+    ==
+    &&
+    dup
+    store 100 // is_asset_in_asset1
+    bnz swap__asset1_in
+
+    // Is asset_in == asset2 and asset_out == asset1? 
+    gtxn 2 XferAsset
+    load 102 // asset2_id
+    ==
+    gtxn 3 XferAsset
+    load 101 // asset1_id
+    ==
+    &&
+    assert // else a combination of unexpected assets
+
+    // asset_in == asset2 and asset_out == asset1
+    load 2 // asset2_balance
+    load 62 // outstanding_asset2_amount
+    - // asset_2_supply
+    store 18 // input_supply
+
+    load 1 // asset1_balance
+    load 61 // outstanding_asset1_amount
+    - // asset_1_supply
+    store 19 // output_supply
+    b swap__fi_or_fo
+
+
+    // asset_in == asset1 and asset_out == asset2
+    swap__asset1_in:
+    load 1 // asset1_balance
+    load 61 // outstanding_asset1_amount
+    - // asset_1_supply
+    store 18 // input_supply
+    load 2 // asset2_balance
+    load 62 // outstanding_asset2_amount
+    - // asset_2_supply
+    store 19 // output_supply
+
+    swap__fi_or_fo:
+    txna ApplicationArgs 1
+    byte "fi" // 'fi'
+    ==
+    bnz swap__fi
+    txna ApplicationArgs 1
+    byte "fo" // 'fo'
+    ==
+    assert
+
+// Fixed Output Swap
+    load 53 // gtxn_3_amount: asset_out_amount
+    load 18 // input_suppply
+    * 
+    int 1000
+    // TODO: Use mulw and TEAL4 divmodw here
+    * // (asset_out_amount * input_suppply) * 1000
+    load 19 // output_supply
+    load 53 // gtxn_3_amount: asset_out_amount
+    - // output_supply - asset_out_amount
+    int 997
+    * // (output_supply - asset_out_amount) * 997
+    / // ((asset_out_amount * input_suppply) * 1000) / ((output_supply - asset_out_amount) * 997)
+    int 1 // 1
+    +
+    dup
+    store 21 // calculated_amount_in
+    
+    // ensure calculated_amount_in > 0
+    int 0
+    >
+
+    // ensure asset_out_amount < output_supply
+    load 53 // gtxn_3_amount: asset_out_amount
+    load 19 // output_supply
+    <
+    &&
+    assert
+
+
+    // calculate amount owed as protocol fees and issue corresponding liquidity_tokens
+    // protocol_fee_portion = asset_out_amount * 0.05%
+    // protocol_fee_portion = (asset_out_amount * 5) / 10000
+    // the protocol is granted a share of the pool for half of this amount because it's a 50/50 pool:
+    // protocol_fee_asset_out_amount = (asset_out_amount * 5) / 20000
+
+    // protocol_fee_liquidity_tokens = issued_liquidity_tokens * (protocol_fee_asset_out_amount / output_supply)
+    // protocol_fee_liquidity_tokens = (issued_liquidity_tokens * protocol_fee_asset_out_amount) / output_supply
+
+    load 53 // gtxn_3_amount: asset_out_amount
+    int 5
+    * 
+    int 20000
+    / // protocol_fee_asset_out_amount
+    load 4 // issued_liquidity_tokens
+    *
+    load 19 // output_supply
+    / 
+    store 42 // protocol_fee_liquidity_tokens
+
+
+    // calculate excess_asset_in
+    // excess_asset_in = asset_in_amount - calculated_amount_in
+    load 52 // gtxn_2_amount: asset_in_amount
+    load 21 // calculated_amount_in
+    // Note: the next line will fail if asset_in_amount < calculated_amount_in
+    - // excess_asset_in
+
+    load 100 // is_asset_in_asset1
+    bz swap_fo__1
+    //asset_in == asset1
+    store 201 // excess_asset_1
+    b update_local_state
+    //asset_in == asset2
+    swap_fo__1:
+    store 202 // excess_asset_2
+    b update_local_state
+
+// Fixed Input Swap
+swap__fi:
+    load 52 // gtxn_2_amount: asset_in_amount
+    int 997
+    * // asset_in_amount * 997
+    load 19 // output_supply
+    * // asset_in_amount * 997 * output_supply
+    // TODO: Use mulw and TEAL4 divmodw here
+
+    load 18 // input_suppply
+    int 1000
+    * // input_suppply * 1000
+    load 52 // gtxn_2_amount: asset_in_amount
+    int 997
+    * // asset_in_amount * 997
+    + // (input_suppply * 1000) + (asset_in_amount * 997)
+    / // (asset_in_amount * 997 * output_supply) / ((input_suppply * 1000) + (asset_in_amount * 997))
+    dup
+    store 20 // calculated_amount_out
+    // ensure calculated_amount_out > 0
+    int 0
+    >
+
+    // ensure calculated_amount_out < output_supply
+    load 20
+    load 19
+    <
+    &&
+    assert
+
+
+    // calculate amount owed as protocol fees and issue corresponding liquidity_tokens
+    // protocol_fee_portion = asset_in_amount * 0.05%
+    // protocol_fee_portion = (asset_in_amount * 5) / 10000
+    // the protocol is granted a share of the pool for half of this amount because it's a 50/50 pool:
+    // protocol_fee_asset_in_amount = (asset_in_amount * 5) / 20000
+
+    // protocol_fee_liquidity_tokens = issued_liquidity_tokens * (protocol_fee_asset_in_amount / input_suppply)
+    // protocol_fee_liquidity_tokens = (issued_liquidity_tokens * protocol_fee_asset_in_amount) / input_suppply
+
+    load 52 // gtxn_2_amount: asset_in_amount
+    int 5
+    *
+    int 20000
+    / // protocol_fee_asset_in_amount
+    load 4 // issued_liquidity_tokens
+    *
+    load 18 // input_suppply
+    / 
+    store 42 // protocol_fee_liquidity_tokens
+
+
+    // calculate excess_asset_out
+    // excess_asset_out = calculated_amount_out - asset_out_amount
+    load 20 // calculated_amount_out
+    load 53 // gtxn_3_amount: asset_out_amount
+    // Note: the next line will fail if asset_out_amount > calculated_amount_out
+    - // excess_asset_out = calculated_amount_out - asset_out_amount
+
+    load 100 // is_asset_in_asset1 aka is_asset_out_asset2
+    bz swap_fi__1
+    //asset_out == asset2
+    store 202 // excess_asset_2
+    b update_local_state
+    //asset_in == asset2
+    swap_fi__1:
+    store 201 // excess_asset_1
+    b update_local_state
+
+
+// Bootstrap
+bootstrap:
+    int 0
+    byte "a1" // 'a1'
+    txna ApplicationArgs 1
+    btoi
+    app_local_put // asset1ID
+    int 0
+    byte "a2" // 'a2'
+    txna ApplicationArgs 2
+    btoi
+    dup
+    store 1
+    app_local_put // asset2ID
+
+    // Ensure that the AssetName of the liquidity asset ends with "{asset1_unit_name}-{asset2_unit_name}"
+    // The Pool LogicSig ensures that it starts with "Tinyman Pool "
+    int 0
+    asset_params_get AssetUnitName
+    assert // Note: This will fail if the asset has no unit name
+    // asset1_unit_name on stack
+    pushbytes "-"
+    concat
+
+    pushbytes "ALGO"
+    load 1
+    bz bootstrap__1
+    pop
+    int 1
+    asset_params_get AssetUnitName
+    assert // Note: This will fail if the asset has no unit name
+    // asset2_unit_name on stack
+
+    bootstrap__1:
+    concat // "{asset1_unit_name}-{asset2_unit_name}"
+    gtxn 2 ConfigAssetName
+    dup
+    len
+    int 13
+    swap
+    substring3
+    ==
+    return
+
+update_local_state:
+
+    // store liquidity_tokens in unclaimed_protocol_fee_token state var
+    int 0
+    byte "p" // unclaimed_protocol_fee_token_key
+    load 64 // unclaimed_protocol_fee_token_amount
+    load 42
+    + // unclaimed_protocol_fee_token_amount += protocol_fee_liquidity_tokens
+    app_local_put // unclaimed_protocol_fee_token_amount
+
+    // record outstanding liquidity token amount in Pool state
+    int 0
+    load 113 // outstanding_liquidity_token_key
+    load 63 // outstanding_liquidity_token
+    load 42 // protocol_fee_liquidity_tokens
+    + // outstanding_liquidity_token_amount += protocol_fee_liquidity_tokens
+    load 203 // excess_liquidity_token
+    + // outstanding_liquidity_token_amount += excess_liquidity_token
+    app_local_put // outstanding_liquidity_token
+
+    int 0
+    load 111 // outstanding_asset1_key
+    load 61 // outstanding_asset1_amount
+    load 201 // excess_asset_1
+    +
+    app_local_put // outstanding_asset1_amount
+
+    int 0
+    load 112 // outstanding_asset2_key
+    load 62 // outstanding_asset2_amount
+    load 202 // excess_asset_2
+    +
+    app_local_put // outstanding_asset2_amount
+
+
+    // record excess liquidity in Pooler account state
+    load 203
+    bz update_local_state__1 // don't record if amount is 0
+    int 1
+    load 123 // excess_liquidity_token_key
+    dup2
+    app_local_get
+    load 203 // excess_liquidity_token
+    + // excess_liquidity_token_amount += excess_liquidity_token
+    app_local_put // excess_liquidity_token_amount
+
+    update_local_state__1:
+    // record excess asset 1 in Pooler account state
+    load 201
+    bz update_local_state__2 // don't record if amount is 0
+    int 1
+    load 121 // excess_asset1_key
+    dup2
+    app_local_get
+    load 201 // excess_asset_1
+    +// excess_asset1_amount += excess_asset_1
+    app_local_put // excess_asset1_amount
+
+    update_local_state__2:
+    // record excess asset 2 in Pooler account state
+    load 202
+    bz update_local_state__3 // don't record if amount is 0
+    int 1
+    load 122 // excess_asset2_key
+    dup2
+    app_local_get
+    load 202 // excess_asset_2
+    +// excess_asset2_amount += excess_asset_2
+    app_local_put // excess_asset2_amount
+
+    update_local_state__3:
+    int 1
+    return
+
+
+success:
+    int 1
+    return
+
+fail:
+    int 0
+    return
