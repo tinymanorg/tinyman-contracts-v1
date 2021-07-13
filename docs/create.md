@@ -12,7 +12,7 @@ Create/deploy the Validator App.
     "snd": "{CREATOR_ADDRESS}",
     "apid": 0,
     "apan": 0, // OnComplete: NoOp
-    "apaa": ['Yw=='] // ['c']
+    "apaa": ['Y3JlYXRl'] // ['create']
     "apls": {"nui": 16}, // Local State Schema: num_uints=16
     "apap": {APPROVAL_PROGRAM_BYTES},
     "apsu": {CLEAR_STATE_PROGRAM_BYTES},

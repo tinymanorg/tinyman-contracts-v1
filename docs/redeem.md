@@ -19,7 +19,7 @@ Claim back 'change' due to slippage in Mint/Burn/Swap process.
   "sig": "{POOLER_SIG}",
 }
 ```
-1. App Call - NoOp call to Validator App with args ['r'], with Pooler account
+1. App Call - NoOp call to Validator App with args ['redeem'], with Pooler account
     - Signed by Pool LogicSig
 
 ```
@@ -29,7 +29,7 @@ Claim back 'change' due to slippage in Mint/Burn/Swap process.
     "snd": "{POOL_ADDRESS}",
     "apid": {VALIDATOR_APP_ID},
     "apan": 0, // OnComplete: NoOp
-    "apaa": ['cg=='] // ['r']
+    "apaa": ['cmVkZWVt'] // ['redeem']
     "apat": [{POOLER/SWAPPER_ADDRESS}],
     "fee": 1000,
     ...

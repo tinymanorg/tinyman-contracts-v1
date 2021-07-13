@@ -19,7 +19,7 @@ Setup a Pool for a pair of assets. The Pool account should be a LogicSig contrac
   "sig": "{POOLER_SIG}",
 }
 ```
-1. App Call - OptIn call to Validator App with args ['bs', asset1ID, asset2ID]
+1. App Call - OptIn call to Validator App with args ['bootstrap', asset1ID, asset2ID]
     - signed by Pool LogicSig
 
 ```
@@ -29,7 +29,7 @@ Setup a Pool for a pair of assets. The Pool account should be a LogicSig contrac
     "snd": "{POOL_ADDRESS}",
     "apid": {VALIDATOR_APP_ID},
     "apan": 1, // OnComplete: OptIn
-    "apaa": ['YnM=', '{ASSET1_ID}', '{ASSET2_ID}'] // ['bs', asset1ID, asset2ID]
+    "apaa": ['Ym9vdHN0cmFw', '{ASSET1_ID}', '{ASSET2_ID}'] // ['bootstrap', asset1ID, asset2ID]
     "apas": [{ASSET1_ID}, {ASSET1_ID}] // or just [{ASSET1_ID}] if asset 2 is Algo
     "fee": 1000,
     ...

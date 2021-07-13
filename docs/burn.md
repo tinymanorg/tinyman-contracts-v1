@@ -19,7 +19,7 @@ Burn Pool liquidity assets in exchange for removing assets from the Pool.
   "sig": "{POOLER_SIG}",
 }
 ```
-1. App Call - NoOp call to Validator App with args ['b'], with Pooler account
+1. App Call - NoOp call to Validator App with args ['burn'], with Pooler account
 
 ```
 {
@@ -28,7 +28,7 @@ Burn Pool liquidity assets in exchange for removing assets from the Pool.
     "snd": "{POOL_ADDRESS}",
     "apid": {VALIDATOR_APP_ID},
     "apan": 0, // OnComplete: NoOp
-    "apaa": ['Yg=='], // ['b']
+    "apaa": ['YnVybg=='], // ['burn']
     "apat": [{POOLER_ADDRESS}],
     "fee": 1000,
     ...

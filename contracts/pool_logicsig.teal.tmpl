@@ -1,4 +1,10 @@
-#pragma version 3
+#pragma version 4
+
+// Tinyman Pool LogicSig
+// Documentation: https://docs.tinyman.org
+
+// This code should be read in conjunction with validator_approval.teal.
+// The validation logic is split between these two programs.
 
 // ensure ASSET_ID_1 > ASSET_ID_2
 byte TMPL_ASSET_ID_1
@@ -54,7 +60,7 @@ int 3
 ==
 &&
 gtxna 1 ApplicationArgs 0
-byte "bs"
+byte "bootstrap"
 ==
 &&
 bnz bootstrap
@@ -71,7 +77,7 @@ gtxn 1 NumAppArgs
 int 2
 ==
 gtxna 1 ApplicationArgs 0
-byte "s"
+byte "swap"
 ==
 &&
 bnz swap
@@ -85,26 +91,26 @@ assert
 
 // Mint?
 gtxna 1 ApplicationArgs 0
-byte "m"
+byte "mint"
 ==
 bnz mint
 
 
 // Burn?
 gtxna 1 ApplicationArgs 0
-byte "b"
+byte "burn"
 ==
 bnz burn
 
 // Redeem?
 gtxna 1 ApplicationArgs 0
-byte "r"
+byte "redeem"
 ==
 bnz redeem
 
 // Fees?
 gtxna 1 ApplicationArgs 0
-byte "f"
+byte "fees"
 ==
 bnz redeem_fees
 

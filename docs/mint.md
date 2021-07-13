@@ -18,7 +18,7 @@ Mint Pool assets in exchange for transferring assets to the Pool account.
   "sig": "{POOLER_SIG}",
 }
 ```
-1. App Call - NoOp call to Validator App with args ['m'], with Pooler account
+1. App Call - NoOp call to Validator App with args ['mint'], with Pooler account
     - Signed by Pool LogicSig
 
 ```
@@ -28,7 +28,7 @@ Mint Pool assets in exchange for transferring assets to the Pool account.
     "snd": "{POOL_ADDRESS}",
     "apid": {VALIDATOR_APP_ID},
     "apan": 0, // OnComplete: NoOp
-    "apaa": ['bQ=='], // ['m']
+    "apaa": ['bWludA=='], // ['mint']
     "apat": [{POOLER_ADDRESS}],
     "fee": 1000,
     ...

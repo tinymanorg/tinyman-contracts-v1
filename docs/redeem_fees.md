@@ -19,7 +19,7 @@ Note: The CREATOR must opt-in to the liquidity assets separately before receivin
   "sig": "{USER_SIG}",
 }
 ```
-1. App Call - NoOp call to Validator App with args ['f']
+1. App Call - NoOp call to Validator App with args ['fees']
     - Signed by Pool LogicSig
 
 ```
@@ -29,7 +29,7 @@ Note: The CREATOR must opt-in to the liquidity assets separately before receivin
     "snd": "{POOL_ADDRESS}",
     "apid": {VALIDATOR_APP_ID},
     "apan": 0, // OnComplete: NoOp
-    "apaa": ['Zg=='] // ['f']
+    "apaa": ['ZmVlcw=='] // ['fees']
     ...
   },
   "lsig": "{POOL_LOGICSIG}",

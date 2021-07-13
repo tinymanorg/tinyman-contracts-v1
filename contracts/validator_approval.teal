@@ -1,14 +1,23 @@
-#pragma version 3
+#pragma version 4
+
+// Tinyman Validator App
+// Documentation: https://docs.tinyman.org
+
+// Note: This code is written targetting TEAL 3 but using divmodw from TEAL4.
+// There are no back jumps, callsubs or other TEAL4 features used.
+
+// This code should be read in conjunction with pool_logicsig.teal.tmpl.
+// The validation logic is split between these two programs.
 
 // Slots:
 // 1: asset1_balance
-// 3: asset2_balance
+// 2: asset2_balance
 // 4: issued_liquidity_tokens
 // 6: liquidity_token_balance
 // 7: calculated_liquidity_token_out
 // 16: calculated_asset1_out
 // 17: calculated_asset2_out
-// 18: input_suppply
+// 18: input_supply
 // 19: output_supply
 // 20: calculated_amount_out
 // 21: calculated_amount_in
@@ -19,6 +28,11 @@
 // 62: outstanding_asset2_amount
 // 63: outstanding_liquidity_token
 // 64: unclaimed_protocol_fee_token_amount
+// 71: asset1_supply
+// 72: asset2_supply
+// 81: final_asset1_supply
+// 82: final_asset2_supply
+// 83: final_issued_liquidity_tokens
 // 100: is_asset_in_asset1
 // 101: asset1_id
 // 102: asset2_id
@@ -60,7 +74,7 @@ bnz success
 
 // Create
 txna ApplicationArgs 0
-byte "c" // create
+byte "create" // create
 ==
 bnz success
 
@@ -69,7 +83,7 @@ txn OnCompletion
 int OptIn
 ==
 txna ApplicationArgs 0
-byte "bs" // bootstrap
+byte "bootstrap" // bootstrap
 ==
 &&
 bnz bootstrap
@@ -171,6 +185,19 @@ byte "p" // unclaimed_protocol_fee_token_key
 app_local_get // unclaimed_protocol_fee_token_amount
 store 64 // unclaimed_protocol_fee_token_amount
 
+// asset1_supply
+load 1
+load 61
+-
+store 71 // asset1_supply
+
+
+// asset2_supply
+load 2
+load 62
+-
+store 72 // asset2_supply
+
 
 // excess_asset1_key
 txn Sender
@@ -202,26 +229,26 @@ store 123 // excess_liquidity_token_key
 
 // Redeem
 txna ApplicationArgs 0
-byte "r" // redeem
+byte "redeem" // redeem
 ==
 bnz redeem
 
 // Redeem Fees
 txna ApplicationArgs 0
-byte "f" // fees
+byte "fees" // fees
 ==
 bnz redeem_fees
 
 // Swap/Mint/Burn
 txna ApplicationArgs 0
-byte "s" // swap
+byte "swap" // swap
 ==
 txna ApplicationArgs 0
-byte "m" //mint
+byte "mint" //mint
 ==
 ||
 txna ApplicationArgs 0
-byte "b" //burn
+byte "burn" //burn
 ==
 ||
 bnz swap_mint_burn
@@ -337,7 +364,7 @@ swap_mint_burn:
 
 
     txna ApplicationArgs 0
-    byte "s" // 'swap'
+    byte "swap" // 'swap'
     ==
     bnz swap
 
@@ -351,13 +378,11 @@ mint_burn__1:
 
     // Mint
     txna ApplicationArgs 0
-    byte "m" // 'mint'
+    byte "mint" // 'mint'
     ==
     bnz mint
 
 // Burn
-
-// TODO: Refactor code to factor out burn proportion (burn_amount / issued_liquidity_tokens)
 
 // burn_amount = gtxn 4 AssetAmount
 // asset1_amount = gtxn 2 AssetAmount
@@ -381,13 +406,18 @@ mint_burn__1:
 
 // burn
     gtxn 4 AssetAmount // burn_amount
-    // calculate asset1_supply
-    load 1 // asset1_balance
-    load 61 // outstanding_asset1_amount
-    - // asset1_supply
-    * // burn_amount * asset1_supply
+    load 71 // asset1_supply
+    mulw // burn_amount * asset1_supply
     load 4 // issued_liquidity_tokens
-    /  // (burn_amount * asset1_supply) / issued_liquidity_tokens
+    int 1
+    mulw // uint128 issued_liquidity_tokens
+    divmodw  // (burn_amount * asset1_supply) / issued_liquidity_tokens
+    pop
+    pop
+    swap
+    pop
+    // only low quotient remains on stack
+    //
     dup // calculated_asset1_out
     store 16 // calculated_asset1_out
     load 52 // gtxn 2 AssetAmount
@@ -397,13 +427,18 @@ mint_burn__1:
 
 
     gtxn 4 AssetAmount // burn_amount
-    // calculate asset2_supply
-    load 2 // asset2_balance
-    load 62 // outstanding_asset2_amount
-    - // asset2_supply
-    * // burn_amount * asset1_supply
+    load 72 // asset2_supply
+    mulw // burn_amount * asset1_supply
     load 4 // issued_liquidity_tokens
-    / // (burn_amount * asset2_supply) / issued_liquidity_tokens
+    int 1
+    mulw // uint128 issued_liquidity_tokens
+
+    divmodw // (burn_amount * asset2_supply) / issued_liquidity_tokens
+    pop
+    pop
+    swap
+    pop
+    // only low quotient remains on stack
     dup
     store 17 // calculated_asset2_out
     load 53 // gtxn_3_amount ASA or Algo asset2_out
@@ -416,6 +451,23 @@ mint_burn__1:
     load 17
     &&
     assert
+
+    load 71 // asset1_supply
+    load 16 // calculated_asset1_out
+    -
+    store 81 // final_asset1_supply
+
+    load 72 // asset2_supply
+    load 17 // calculated_asset2_out
+    -
+    store 82 // final_asset2_supply
+
+    load 4 // issued_liquidity_tokens
+    gtxn 4 AssetAmount // burn_amount
+    -
+    store 83 // final_issued_liquidity_tokens
+
+
     b update_local_state
 
 
@@ -444,6 +496,17 @@ mint_burn__1:
 // put excess_liquidity_token_amount += excess_liquidity_token
 
 mint:
+    load 71 // asset1_supply
+    load 52 // gtxn_2_amount
+    +
+    store 81 // final_asset1_supply
+
+    load 72 // asset2_supply
+    load 53 // gtxn_3_amount
+    +
+    store 82 // final_asset2_supply
+
+
     load 4 // issued_liquidity_tokens
     int 0
     ==  // is it first minting?
@@ -452,22 +515,30 @@ mint:
     // subsequent minting:
     load 52 // gtxn_2_amount
     load 4 // issued_liquidity_tokens
-    // TODO: Use mulw and TEAL4 divmodw here
-    * // asset1_amount * issued_liquidity_tokens
-    load 1 // asset1_balance
-    load 61 // outstanding_asset1_amount
-    - // asset1_supply
-    / // asset1_amount * issued_liquidity_tokens / asset1_supply
+    mulw // asset1_amount * issued_liquidity_tokens
+    load 71 // asset1_supply
+    int 1
+    mulw // uint128 asset1_supply
+    divmodw // asset1_amount * issued_liquidity_tokens / asset1_supply
+    pop
+    pop
+    swap
+    pop
+    // only low quotient remains on stack
     // A
 
     load 53 // gtxn_3_amount
     load 4 // issued_liquidity_tokens
-    // TODO: Use mulw and TEAL4 divmodw here
-    * // asset2_amount * issued_liquidity_tokens
-    load 2 // asset2_balance
-    load 62 // outstanding_asset2_amount
-    - // asset2_supply
-    / // asset2_amount * issued_liquidity_tokens / asset2_supply
+    mulw // asset2_amount * issued_liquidity_tokens
+    load 72 // asset2_supply
+    int 1
+    mulw // uint128 asset2_supply
+    divmodw // asset2_amount * issued_liquidity_tokens / asset2_supply
+    pop
+    pop
+    swap
+    pop
+    // only low quotient remains on stack
     // B
 
     // Min(A, B)
@@ -477,6 +548,10 @@ mint:
     > // A > B
     select // B
     // calculated_liquidity_token_out = Min(A, B)
+    dup
+    load 4 // issued_liquidity_tokens
+    +
+    store 83 // final_issued_liquidity_tokens
 
     gtxn 4 AssetAmount // liquidity_token_amount
     - // excess_liquidity_token
@@ -553,16 +628,27 @@ mint:
     int 1000
     store 63 // outstanding_liquidity_token_amount
 
+    load 4 // issued_liquidity_tokens
+    gtxn 4 AssetAmount // liquidity_token_amount
+    int 1000 // MINIMUM_LIQUIDITY
+    + // minted_liquidity_token
+    +
+    store 83 // final_issued_liquidity_tokens
+
     b update_local_state
 // End Mint
 
 
 
 // Swap
-	// if fixed input:
-	// 	calculated_amount_out = (asset_in_amount * 997 * output_supply) / 
-	// 	((input_supply * 1000) + (asset_in_amount * 997))
 
+    // k = input_supply * output_supply
+    // ignoring fees, k must remain constant 
+    // (input_supply + asset_in) * (output_supply - amount_out) = k
+
+	// if fixed input:
+    //  asset_in_amount_minus_fee = asset_in_amount * 997/1000
+	//  calculated_amount_out = output_supply - (k / (input_supply + asset_in_amount_minus_fee))
 
 	// 	excess_asset_out = calculated_amount_out - asset_out_amount
 	// 	# record outstanding asset out amount in Pool state
@@ -576,8 +662,9 @@ mint:
 
 	// else:
 
-	// 	calculated_amount_in = ((asset_out_amount * input_suppply * 1000) / 
-	// 	((output_supply - asset_out_amount) * 997)) + 1
+    //  k = input_supply * output_supply
+    //  calculated_amount_in_without_fee = (k / (output_supply - asset_out_amount)) - input_supply
+    //  calculated_amount_in = calculated_amount_in * 1000/997
 
 	// 	excess_asset_in = asset_in_amount - calculated_amount_in
 	// 	# record outstanding asset in amount in Pool state
@@ -588,8 +675,6 @@ mint:
 
 	// 	# ensure calculated_amount_in > 0
 	// 	# ensure asset_out_amount < output_supply
-
-
 
 
 swap:
@@ -616,27 +701,19 @@ swap:
     assert // else a combination of unexpected assets
 
     // asset_in == asset2 and asset_out == asset1
-    load 2 // asset2_balance
-    load 62 // outstanding_asset2_amount
-    - // asset_2_supply
+    load 72 // asset2_supply
     store 18 // input_supply
 
-    load 1 // asset1_balance
-    load 61 // outstanding_asset1_amount
-    - // asset_1_supply
+    load 71 // asset1_supply
     store 19 // output_supply
     b swap__fi_or_fo
 
 
     // asset_in == asset1 and asset_out == asset2
     swap__asset1_in:
-    load 1 // asset1_balance
-    load 61 // outstanding_asset1_amount
-    - // asset_1_supply
+    load 71 // asset1_supply
     store 18 // input_supply
-    load 2 // asset2_balance
-    load 62 // outstanding_asset2_amount
-    - // asset_2_supply
+    load 72 // asset2_supply
     store 19 // output_supply
 
     swap__fi_or_fo:
@@ -650,20 +727,33 @@ swap:
     assert
 
 // Fixed Output Swap
-    load 53 // gtxn_3_amount: asset_out_amount
-    load 18 // input_suppply
-    * 
-    int 1000
-    // TODO: Use mulw and TEAL4 divmodw here
-    * // (asset_out_amount * input_suppply) * 1000
+    // k = input_supply * output_supply
+    // calculated_amount_in = (k / (output_supply - asset_out_amount)) - input_supply
+    // calculated_amount_in_with_fee = calculated_amount_in * 1000/997
+
+    load 18 // input_supply
+    load 19 // output_supply
+    mulw // k
+
     load 19 // output_supply
     load 53 // gtxn_3_amount: asset_out_amount
-    - // output_supply - asset_out_amount
+    -
+    int 1
+    mulw
+    divmodw
+    pop
+    pop
+    swap
+    pop
+    // only low quotient remains on stack
+    // (k / (output_supply - asset_out_amount))
+    load 18 // input_supply
+    - // (k / (output_supply - asset_out_amount)) - input_supply
     int 997
-    * // (output_supply - asset_out_amount) * 997
-    / // ((asset_out_amount * input_suppply) * 1000) / ((output_supply - asset_out_amount) * 997)
-    int 1 // 1
-    +
+    /
+    int 1000
+    * // calculated_amount_in_with_fee = calculated_amount_in * 1000/997
+
     dup
     store 21 // calculated_amount_in
     
@@ -678,28 +768,6 @@ swap:
     &&
     assert
 
-
-    // calculate amount owed as protocol fees and issue corresponding liquidity_tokens
-    // protocol_fee_portion = asset_out_amount * 0.05%
-    // protocol_fee_portion = (asset_out_amount * 5) / 10000
-    // the protocol is granted a share of the pool for half of this amount because it's a 50/50 pool:
-    // protocol_fee_asset_out_amount = (asset_out_amount * 5) / 20000
-
-    // protocol_fee_liquidity_tokens = issued_liquidity_tokens * (protocol_fee_asset_out_amount / output_supply)
-    // protocol_fee_liquidity_tokens = (issued_liquidity_tokens * protocol_fee_asset_out_amount) / output_supply
-
-    load 53 // gtxn_3_amount: asset_out_amount
-    int 5
-    * 
-    int 20000
-    / // protocol_fee_asset_out_amount
-    load 4 // issued_liquidity_tokens
-    *
-    load 19 // output_supply
-    / 
-    store 42 // protocol_fee_liquidity_tokens
-
-
     // calculate excess_asset_in
     // excess_asset_in = asset_in_amount - calculated_amount_in
     load 52 // gtxn_2_amount: asset_in_amount
@@ -711,29 +779,64 @@ swap:
     bz swap_fo__1
     //asset_in == asset1
     store 201 // excess_asset_1
-    b update_local_state
+
+    load 71 // asset1_supply
+    load 21 // calculated_amount_in
+    +
+    store 81 // final_asset1_supply
+
+    load 72 // asset2_supply
+    load 53 // gtxn_3_amount: asset_out_amount
+    -
+    store 82 // final_asset2_supply
+
+    b calculate_protocol_fee
     //asset_in == asset2
     swap_fo__1:
     store 202 // excess_asset_2
-    b update_local_state
+
+    load 72 // asset2_supply
+    load 21 // calculated_amount_in
+    +
+    store 82 // final_asset2_supply
+
+    load 71 // asset1_supply
+    load 53 // gtxn_3_amount: asset_out_amount
+    -
+    store 81 // final_asset1_supply
+
+    b calculate_protocol_fee
 
 // Fixed Input Swap
 swap__fi:
-    load 52 // gtxn_2_amount: asset_in_amount
-    int 997
-    * // asset_in_amount * 997
-    load 19 // output_supply
-    * // asset_in_amount * 997 * output_supply
-    // TODO: Use mulw and TEAL4 divmodw here
+    // k = input_supply * output_supply
+    // asset_in_amount_minus_fee = asset_in_amount * 997/1000
+    // calculated_amount_out = output_supply - (k / (input_supply + asset_in_amount_minus_fee))
 
-    load 18 // input_suppply
-    int 1000
-    * // input_suppply * 1000
+    load 19 // output_supply
+
+    load 18 // input_supply
+    load 19 // output_supply
+    mulw // k
+
+    load 18 // input_supply
+
     load 52 // gtxn_2_amount: asset_in_amount
+    dup
+    store 21 // calculated_amount_in == asset_in_amount 
     int 997
     * // asset_in_amount * 997
-    + // (input_suppply * 1000) + (asset_in_amount * 997)
-    / // (asset_in_amount * 997 * output_supply) / ((input_suppply * 1000) + (asset_in_amount * 997))
+    int 1000
+    / // asset_in_amount_minus_fee
+    addw // (input_supply + asset_in_amount_minus_fee)
+    divmodw
+    pop
+    pop
+    swap
+    pop
+    // k / (input_supply + asset_in_amount_minus_fee)
+    - // output_supply - (k / (input_supply + asset_in_amount_minus_fee))
+
     dup
     store 20 // calculated_amount_out
     // ensure calculated_amount_out > 0
@@ -747,28 +850,6 @@ swap__fi:
     &&
     assert
 
-
-    // calculate amount owed as protocol fees and issue corresponding liquidity_tokens
-    // protocol_fee_portion = asset_in_amount * 0.05%
-    // protocol_fee_portion = (asset_in_amount * 5) / 10000
-    // the protocol is granted a share of the pool for half of this amount because it's a 50/50 pool:
-    // protocol_fee_asset_in_amount = (asset_in_amount * 5) / 20000
-
-    // protocol_fee_liquidity_tokens = issued_liquidity_tokens * (protocol_fee_asset_in_amount / input_suppply)
-    // protocol_fee_liquidity_tokens = (issued_liquidity_tokens * protocol_fee_asset_in_amount) / input_suppply
-
-    load 52 // gtxn_2_amount: asset_in_amount
-    int 5
-    *
-    int 20000
-    / // protocol_fee_asset_in_amount
-    load 4 // issued_liquidity_tokens
-    *
-    load 18 // input_suppply
-    / 
-    store 42 // protocol_fee_liquidity_tokens
-
-
     // calculate excess_asset_out
     // excess_asset_out = calculated_amount_out - asset_out_amount
     load 20 // calculated_amount_out
@@ -780,10 +861,68 @@ swap__fi:
     bz swap_fi__1
     //asset_out == asset2
     store 202 // excess_asset_2
-    b update_local_state
+
+    load 71 // asset1_supply
+    load 52 // gtxn_2_amount: asset_in_amount
+    +
+    store 81 // final_asset1_supply
+
+    load 72 // asset2_supply
+    load 20 // calculated_amount_out
+    -
+    store 82 // final_asset2_supply
+
+    b calculate_protocol_fee
     //asset_in == asset2
     swap_fi__1:
     store 201 // excess_asset_1
+
+    load 71 // asset1_supply
+    load 20 // calculated_amount_out
+    -
+    store 81 // final_asset1_supply
+
+    load 72 // asset2_supply
+    load 52 // gtxn_2_amount: asset_in_amount
+    +
+    store 82 // final_asset2_supply
+
+    b calculate_protocol_fee
+
+calculate_protocol_fee:
+    // calculate amount owed as protocol fees and issue corresponding liquidity_tokens:
+    // protocol_fee_portion = asset_in_amount * 0.05%
+    // protocol_fee_portion = (asset_in_amount * 5) / 10000
+    
+    // the protocol is granted a share of the pool for half of this amount because it's a 50/50 pool:
+    // protocol_fee_asset_in_amount = (asset_in_amount * 5) / 20000
+    // protocol_fee_liquidity_tokens = issued_liquidity_tokens * (protocol_fee_asset_in_amount / input_supply)
+    
+    // refactor to reduce rounding errors:
+    // protocol_fee_liquidity_tokens = (issued_liquidity_tokens * (asset_in_amount * 5)) / (20000 * input_supply)
+
+    load 21 // asset_in_amount
+    int 5
+    * 
+    load 4 // issued_liquidity_tokens
+    mulw
+    int 20000
+    load 18 // input_supply
+    mulw
+    divmodw
+    pop
+    pop
+    swap
+    pop
+    // only low quotient remains on stack
+
+    dup
+    store 42 // protocol_fee_liquidity_tokens
+
+    load 4 // issued_liquidity_tokens
+    +
+    store 83 // final_issued_liquidity_tokens
+
     b update_local_state
 
 
@@ -865,6 +1004,23 @@ update_local_state:
     +
     app_local_put // outstanding_asset2_amount
 
+
+    // store final_asset_1_supply and final_asset_2_supply in pool state
+    int 0
+    byte "s1"
+    load 81 // final_asset_1_supply
+    app_local_put // asset_1_supply
+
+    int 0
+    byte "s2"
+    load 82 // final_asset_2_supply
+    app_local_put // asset_2_supply
+
+    // store final_issued_liquidity_tokens in pool state
+    int 0
+    byte "ilt"
+    load 83 // final_issued_liquidity_tokens
+    app_local_put // final_issued_liquidity_tokens
 
     // record excess liquidity in Pooler account state
     load 203

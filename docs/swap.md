@@ -19,7 +19,7 @@ Swap one asset (ASA or Algo) for another with the Pool.
   "sig": "{SWAPPER_SIG}",
 }
 ```
-1. App Call - NoOp call to Validator App with args ['s', (fixed-input) or 'fo' (fixed-output)], with Swapper account
+1. App Call - NoOp call to Validator App with args ['swap', (fixed-input) or 'fo' (fixed-output)], with Swapper account
     - Signed by Pool LogicSig
     - Argument 1 'fi' specifies that the input (sell) is fixed but the output may vary with slippage
     - Argument 1 'fo' specifies that the output (buy) is fixed but the input may vary with slippage
@@ -31,7 +31,7 @@ Swap one asset (ASA or Algo) for another with the Pool.
     "snd": "{POOL_ADDRESS}",
     "apid": {VALIDATOR_APP_ID},
     "apan": 0, // OnComplete: NoOp
-    "apaa": ['cw==', 'Zmk=' or 'Zm8='], // ['s', 'fi' (fixed-input) or 'fo' (fixed-output)]
+    "apaa": ['c3dhcA==', 'Zmk=' or 'Zm8='], // ['swap', 'fi' (fixed-input) or 'fo' (fixed-output)]
     "apat": [{SWAPPER_ADDRESS}],
     "fee": 1000,
     ...
