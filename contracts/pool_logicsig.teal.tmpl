@@ -7,10 +7,8 @@
 // The validation logic is split between these two programs.
 
 // ensure ASSET_ID_1 > ASSET_ID_2
-byte TMPL_ASSET_ID_1
-btoi
-byte TMPL_ASSET_ID_2
-btoi
+int TMPL_ASSET_ID_1
+int TMPL_ASSET_ID_2
 >
 assert
 
@@ -46,8 +44,7 @@ int appl // ApplicationCall
 assert
 
 gtxn 1 ApplicationID
-byte TMPL_VALIDATOR_APP_ID
-btoi
+int TMPL_VALIDATOR_APP_ID
 ==
 assert
 
@@ -119,10 +116,12 @@ err
 
 bootstrap:
     gtxna 1 ApplicationArgs 1
-    byte TMPL_ASSET_ID_1
+    btoi
+    int TMPL_ASSET_ID_1
     ==
     gtxna 1 ApplicationArgs 2
-    byte TMPL_ASSET_ID_2
+    btoi
+    int TMPL_ASSET_ID_2
     ==
     &&
     assert
@@ -223,8 +222,7 @@ bootstrap:
 
     // ensure the asset id is the same as asset 1
     gtxn 3 XferAsset
-    byte TMPL_ASSET_ID_1
-    btoi
+    int TMPL_ASSET_ID_1
     ==
     assert
 
@@ -244,8 +242,7 @@ bootstrap:
     global GroupSize
     int 4
     ==
-    byte TMPL_ASSET_ID_2
-    btoi
+    int TMPL_ASSET_ID_2
     int 0
     ==
     &&
@@ -277,8 +274,7 @@ bootstrap:
 
     // ensure the asset id is the same as asset 2
     gtxn 4 XferAsset
-    byte TMPL_ASSET_ID_2
-    btoi
+    int TMPL_ASSET_ID_2
     ==
     assert
 

@@ -332,6 +332,87 @@ redeem:
 
 swap_mint_burn:
 
+    // In the first transaction of a block we update state used for oracles:
+    //  * cumlative_price1 (c1)
+    //  * cumlative_price2 (c2)
+    //  * last_updated_timestamp (t)
+    //
+    // cumlative_price1 and cumlative_price2 accumulate the price * 10e6
+    // They are uint64s and wrap around by design
+    // Recorded prices in state (p1, p2) from the previous swap/mint/burn are used
+
+    global LatestTimestamp
+    int 0
+    byte "t"
+    app_local_get // last_updated_timestamp
+    - // time_delta
+    dup
+    store 250 // time_delta
+    // if time_delta is 0 it means cumulative prices have already been updated for this round
+    bz skip_oracle_update
+
+    // this must be the first operation of the round
+    // record cumlative prices:
+
+    // cumlative_price1 = cumlative_price1 + (price1 * time_delta)
+    int 0
+    byte "c1"
+    dup2
+    app_local_get // cumlative_price1
+    int 0
+    byte "p1"
+    app_local_get // price1
+    load 250 // time_delta
+    * // multiply by time_delta
+    // (price1 * time_delta) on stack
+    // now calculate: (cumlative_price1 + (price1 * time_delta)) % (MAX_UINT64 + 1)
+    addw
+    int 0xffffffffffffffff
+    int 1
+    addw
+    divmodw
+    store 251
+    pop
+    pop
+    pop
+    load 251
+    // cumlative_price1 + (price1 * time_delta)
+    app_local_put // cumlative_price1
+
+
+    // cumlative_price2 = cumlative_price2 + (price2 * time_delta)
+    int 0
+    byte "c2"
+    dup2
+    app_local_get // cumlative_price2
+    int 0
+    byte "p2"
+    app_local_get // price2
+    load 250 // time_delta
+    * // multiply by time_delta
+    // (price2 * time_delta) on stack
+    // now calculate: (cumlative_price2 + (price2 * time_delta)) % (MAX_UINT64 + 1)
+    addw
+    int 0xffffffffffffffff
+    int 1
+    addw
+    divmodw
+    store 250
+    pop
+    pop
+    pop
+    load 250
+    // cumlative_price2 + (price2 * time_delta)
+    app_local_put // cumlative_price2
+
+
+    int 0
+    byte "t"
+    global LatestTimestamp
+    app_local_put // update last_updated_timestamp
+
+
+    skip_oracle_update:
     gtxn 3 AssetAmount // asset amount
     gtxn 3 Amount // or algo amount
     +
@@ -560,9 +641,11 @@ mint:
 
     mint__first_minting:
     // minted_liquidity_token = liquidity_token_amount + MINIMUM_LIQUIDITY
-    // assert(minted_liquidity_token <= sqrt(asset1_amount * asset2_amount))
+    // assert(minted_liquidity_token == floor(sqrt(asset1_amount * asset2_amount)))
     // Same as:
     // assert((minted_liquidity_token * minted_liquidity_token) <= (asset1_amount * asset2_amount))
+    // &&
+    // assert(((minted_liquidity_token + 1) * (minted_liquidity_token + 1)) > (asset1_amount * asset2_amount))
 
     // the liquidity_token_id is not in local state at this point
     // put the liquidity_token_id in a scratch slot & the Pool local state
@@ -614,16 +697,43 @@ mint:
     store 241 // store amount_product_lo, leave high on stack
     dup2
     < // compare highs
-    // if minted_squared_hi < amount_product_hi no need to check lows
+    // if minted_squared_hi < amount_product_hi don't check lows
     bnz mint__first_minting_1
     ==
+    assert
     load 240 // minted_squared_lo
     load 241 // amount_product_lo
     <= // compare lows: minted_squared_lo <= amount_product_lo
-    &&
+    assert
+    
+    mint__first_minting_1:
+    // assert (minted_liquidity_token + 1) * (minted_liquidity_token + 1) > asset1_amount * asset2_amount
+    gtxn 4 AssetAmount // liquidity_token_amount
+    int 1000 // MINIMUM_LIQUIDITY
+    + // minted_liquidity_token
+    int 1
+    +
+    dup
+    mulw // minted_liquidity_token * minted_liquidity_token
+    store 240 // store minted_squared_lo, leave high on stack
+
+    load 52 // gtxn 2 AssetAmount: asset1_amount
+    load 53 // gtxn_3_amount: assset2_amount
+    mulw // asset1_amount * asset2_amount
+    store 241 // store amount_product_lo, leave high on stack
+    dup2
+    > // compare highs
+    // if minted_squared_hi > amount_product_hi don't check lows
+    bnz mint__first_minting_2
+    ==
+    assert // assert highs are equal
+    load 240 // minted_squared_lo
+    load 241 // amount_product_lo
+    > // compare lows: minted_squared_lo > amount_product_lo
     assert
 
-    mint__first_minting_1:
+
+    mint__first_minting_2:
     // lock up the first MINIMUM_LIQUIDITY tokens
     int 1000
     store 63 // outstanding_liquidity_token_amount
@@ -1015,6 +1125,40 @@ update_local_state:
     byte "s2"
     load 82 // final_asset_2_supply
     app_local_put // asset_2_supply
+
+    // calculate and store price1
+    int 0
+    byte "p1"
+    load 82 // final_asset_2_supply
+    int 1000000 // 1e6
+    mulw
+    load 81 // final_asset_1_supply
+    int 1
+    mulw
+    divmodw
+    pop
+    pop
+    swap
+    pop
+    // price1 on stack
+    app_local_put // price1
+
+    // calculate and store price2
+    int 0
+    byte "p2"
+    load 81 // final_asset_1_supply
+    int 1000000 // 1e6
+    mulw
+    load 82 // final_asset_2_supply
+    int 1
+    mulw
+    divmodw
+    pop
+    pop
+    swap
+    pop
+    // price2 on stack
+    app_local_put // price2
 
     // store final_issued_liquidity_tokens in pool state
     int 0
