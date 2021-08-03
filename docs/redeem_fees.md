@@ -12,7 +12,7 @@ Note: The CREATOR must opt-in to the liquidity assets separately before receivin
   "txn": {
     "type": "pay",
     "rcv": "{POOL_ADDRESS}",
-    "snd": "{USER_ADDRESS",
+    "snd": "{USER_ADDRESS}",
     "amt": 2000,
     ...
   },
@@ -29,7 +29,8 @@ Note: The CREATOR must opt-in to the liquidity assets separately before receivin
     "snd": "{POOL_ADDRESS}",
     "apid": {VALIDATOR_APP_ID},
     "apan": 0, // OnComplete: NoOp
-    "apaa": ['ZmVlcw=='] // ['fees']
+    "apaa": ['ZmVlcw=='], // ['fees']
+    "apas": [{ASSET1_ID}, {ASSET1_ID}, {LIQUIDITY_ASSET_ID}] // or just [{ASSET1_ID}, {LIQUIDITY_ASSET_ID}] if asset 2 is Algo
     ...
   },
   "lsig": "{POOL_LOGICSIG}",

@@ -11,7 +11,7 @@ Swap one asset (ASA or Algo) for another with the Pool.
   "txn": {
     "type": "pay",
     "rcv": "{POOL_ADDRESS}",
-    "snd": "{SWAPPER_ADDRESS",
+    "snd": "{SWAPPER_ADDRESS}",
     "amt": 2000,
     "fee": 1000,
     ...
@@ -33,6 +33,7 @@ Swap one asset (ASA or Algo) for another with the Pool.
     "apan": 0, // OnComplete: NoOp
     "apaa": ['c3dhcA==', 'Zmk=' or 'Zm8='], // ['swap', 'fi' (fixed-input) or 'fo' (fixed-output)]
     "apat": [{SWAPPER_ADDRESS}],
+    "apas": [{ASSET1_ID}, {ASSET1_ID}, {LIQUIDITY_ASSET_ID}] // or just [{ASSET1_ID}, {LIQUIDITY_ASSET_ID}] if asset 2 is Algo
     "fee": 1000,
     ...
   },

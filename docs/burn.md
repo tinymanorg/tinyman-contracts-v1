@@ -11,7 +11,7 @@ Burn Pool liquidity assets in exchange for removing assets from the Pool.
   "txn": {
     "type": "pay",
     "rcv": "{POOL_ADDRESS}",
-    "snd": "{POOLER_ADDRESS",
+    "snd": "{POOLER_ADDRESS}",
     "amt": 3000,
     "fee": 1000,
     ...
@@ -30,6 +30,7 @@ Burn Pool liquidity assets in exchange for removing assets from the Pool.
     "apan": 0, // OnComplete: NoOp
     "apaa": ['YnVybg=='], // ['burn']
     "apat": [{POOLER_ADDRESS}],
+    "apas": [{ASSET1_ID}, {ASSET1_ID}, {LIQUIDITY_ASSET_ID}] // or just [{ASSET1_ID}, {LIQUIDITY_ASSET_ID}] if asset 2 is Algo
     "fee": 1000,
     ...
   },

@@ -10,8 +10,8 @@ Setup a Pool for a pair of assets. The Pool account should be a LogicSig contrac
   "txn": {
     "type": "pay",
     "rcv": "{POOL_ADDRESS}",
-    "snd": "{POOLER_ADDRESS",
-    "amt": 675000,
+    "snd": "{POOLER_ADDRESS}",
+    "amt": 961000, // or 860000 if asset 2 is Algo
     "fee": 1000,
     "note": "",
     ...

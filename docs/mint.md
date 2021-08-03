@@ -10,7 +10,7 @@ Mint Pool assets in exchange for transferring assets to the Pool account.
   "txn": {
     "type": "pay",
     "rcv": "{POOL_ADDRESS}",
-    "snd": "{POOLER_ADDRESS",
+    "snd": "{POOLER_ADDRESS}",
     "amt": 2000,
     "fee": 1000,
     ...
@@ -30,6 +30,7 @@ Mint Pool assets in exchange for transferring assets to the Pool account.
     "apan": 0, // OnComplete: NoOp
     "apaa": ['bWludA=='], // ['mint']
     "apat": [{POOLER_ADDRESS}],
+    "apas": [{ASSET1_ID}, {ASSET1_ID}, {LIQUIDITY_ASSET_ID}] // or just [{ASSET1_ID}, {LIQUIDITY_ASSET_ID}] if asset 2 is Algo
     "fee": 1000,
     ...
   },

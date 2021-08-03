@@ -11,7 +11,7 @@ Claim back 'change' due to slippage in Mint/Burn/Swap process.
   "txn": {
     "type": "pay",
     "rcv": "{POOL_ADDRESS}",
-    "snd": "{POOLER_ADDRESS",
+    "snd": "{POOLER_ADDRESS}",
     "amt": 3000,
     "fee": 1000,
     ...
@@ -31,6 +31,7 @@ Claim back 'change' due to slippage in Mint/Burn/Swap process.
     "apan": 0, // OnComplete: NoOp
     "apaa": ['cmVkZWVt'] // ['redeem']
     "apat": [{POOLER/SWAPPER_ADDRESS}],
+    "apas": [{ASSET1_ID}, {ASSET1_ID}, {LIQUIDITY_ASSET_ID}] // or just [{ASSET1_ID}, {LIQUIDITY_ASSET_ID}] if asset 2 is Algo
     "fee": 1000,
     ...
   },

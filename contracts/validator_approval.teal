@@ -3,7 +3,7 @@
 // Tinyman Validator App
 // Documentation: https://docs.tinyman.org
 
-// Note: This code is written targetting TEAL 3 but using divmodw from TEAL4.
+// Note: This code is written targeting TEAL 3 but using divmodw from TEAL4.
 // There are no back jumps, callsubs or other TEAL4 features used.
 
 // This code should be read in conjunction with pool_logicsig.teal.tmpl.
@@ -104,7 +104,7 @@ store 101 // asset1_id
 int 0
 load 101 // asset1_id
 asset_holding_get AssetBalance // get asset1 balance
-pop // discard exists flag 
+assert // assert asset exists
 store 1 // store asset1_balance
 
 int 0
@@ -112,7 +112,12 @@ byte "a2" // asset2 key
 app_local_get // get asset2 id
 store 102 // asset2_id
 
-// calculate and store asset2_balance
+// store asset2_balance
+load 102 // asset2_id
+bnz common_setup__if_not_algo
+
+// common_setup__if_algo:
+// store calculate and store asset2_balance
 int 0
 balance // algo balance
 int 0
@@ -122,15 +127,17 @@ txn Fee
 +
 gtxn 0 Amount
 - // ((balance - min_balance) + fee) - gtxn0 amount
+store 2 // store asset2_balance
+b common_setup__1
 
+common_setup__if_not_algo:
 int 0
 load 102 // asset2_id
 asset_holding_get AssetBalance
-pop // discard exists flag
-load 102 // asset2_id
-select // if asset2_id != 0, AssetBalance else Algo balance
+assert // assert asset exists
 store 2 // store asset2_balance
 
+common_setup__1:
 
 // liquidity_token_id
 int 0
@@ -161,7 +168,7 @@ store 112 // outstanding_asset2_key
 
 // load outstanding asset 2 from Pool account state
 int 0
-load 112 // outstanding_asset1_key
+load 112 // outstanding_asset2_key
 app_local_get // outstanding_asset2_amount
 store 62
 
@@ -267,9 +274,12 @@ redeem_fees:
     == // ensure the asset in gtxn2 really is the liquidity token
     assert
 
+    gtxn 2 AssetAmount // redeemed_token_amount
+    assert
+
     gtxn 2 AssetReceiver
     global CreatorAddress
-    == // only the creator (of the validator app) can reedem fees
+    == // only the creator (of the validator app) can redeem fees
     assert
 
     // outstanding_liquidity_token_amount -= redeemed_token_amount
@@ -284,11 +294,25 @@ redeem_fees:
     // NOTE: This operation (-) will cause an error if redeeming amount is > unclaimed_protocol_fee_token_amount
     -
     store 64
-    b update_local_state
+
+    // store liquidity_tokens in unclaimed_protocol_fee_token state var
+    int 0
+    byte "p" // unclaimed_protocol_fee_token_key
+    load 64 // unclaimed_protocol_fee_token_amount
+    app_local_put // unclaimed_protocol_fee_token_amount
+
+    // record outstanding liquidity token amount in Pool state
+    int 0
+    load 113 // outstanding_liquidity_token_key
+    load 63 // outstanding_liquidity_token
+    app_local_put // outstanding_liquidity_token
+
+    int 1
+    return
 
 // Redeem
 redeem:
-    // ensure reedeming amount > 0
+    // ensure redeeming amount > 0
     load 52 // gtxn_2_amount
     assert
 
@@ -333,11 +357,11 @@ redeem:
 swap_mint_burn:
 
     // In the first transaction of a block we update state used for oracles:
-    //  * cumlative_price1 (c1)
-    //  * cumlative_price2 (c2)
+    //  * cumulative_price1 (c1)
+    //  * cumulative_price2 (c2)
     //  * last_updated_timestamp (t)
     //
-    // cumlative_price1 and cumlative_price2 accumulate the price * 10e6
+    // cumulative_price1 and cumulative_price2 accumulate the price * 10e6
     // They are uint64s and wrap around by design
     // Recorded prices in state (p1, p2) from the previous swap/mint/burn are used
 
@@ -352,20 +376,20 @@ swap_mint_burn:
     bz skip_oracle_update
 
     // this must be the first operation of the round
-    // record cumlative prices:
+    // record cumulative prices:
 
-    // cumlative_price1 = cumlative_price1 + (price1 * time_delta)
+    // cumulative_price1 = cumulative_price1 + (price1 * time_delta)
     int 0
     byte "c1"
     dup2
-    app_local_get // cumlative_price1
+    app_local_get // cumulative_price1
     int 0
     byte "p1"
     app_local_get // price1
     load 250 // time_delta
     * // multiply by time_delta
     // (price1 * time_delta) on stack
-    // now calculate: (cumlative_price1 + (price1 * time_delta)) % (MAX_UINT64 + 1)
+    // now calculate: (cumulative_price1 + (price1 * time_delta)) % (MAX_UINT64 + 1)
     addw
     int 0xffffffffffffffff
     int 1
@@ -376,34 +400,34 @@ swap_mint_burn:
     pop
     pop
     load 251
-    // cumlative_price1 + (price1 * time_delta)
-    app_local_put // cumlative_price1
+    // cumulative_price1 + (price1 * time_delta)
+    app_local_put // cumulative_price1
 
 
-    // cumlative_price2 = cumlative_price2 + (price2 * time_delta)
+    // cumulative_price2 = cumulative_price2 + (price2 * time_delta)
     int 0
     byte "c2"
     dup2
-    app_local_get // cumlative_price2
+    app_local_get // cumulative_price2
     int 0
     byte "p2"
     app_local_get // price2
     load 250 // time_delta
     * // multiply by time_delta
     // (price2 * time_delta) on stack
-    // now calculate: (cumlative_price2 + (price2 * time_delta)) % (MAX_UINT64 + 1)
+    // now calculate: (cumulative_price2 + (price2 * time_delta)) % (MAX_UINT64 + 1)
     addw
     int 0xffffffffffffffff
     int 1
     addw
     divmodw
-    store 250
+    store 251
     pop
     pop
     pop
-    load 250
-    // cumlative_price2 + (price2 * time_delta)
-    app_local_put // cumlative_price2
+    load 251
+    // cumulative_price2 + (price2 * time_delta)
+    app_local_put // cumulative_price2
 
 
     int 0
@@ -431,7 +455,7 @@ swap_mint_burn:
     int 0
     load 103
     asset_holding_get AssetBalance
-    pop
+    assert // assert asset exists
     store 6 // liquidity_token_balance
 
     // calculate issued liquidity
@@ -667,7 +691,7 @@ mint:
     int 0
     load 103 // liquidity_token_id
     asset_holding_get AssetBalance // liquidity_token_balance
-    pop
+    assert // assert asset exists
     assert
 
     // ensure it is NOT asset1
@@ -1042,13 +1066,15 @@ bootstrap:
     byte "a1" // 'a1'
     txna ApplicationArgs 1
     btoi
+    dup
+    store 101
     app_local_put // asset1ID
     int 0
     byte "a2" // 'a2'
     txna ApplicationArgs 2
     btoi
     dup
-    store 1
+    store 102
     app_local_put // asset2ID
 
     // Ensure that the AssetName of the liquidity asset ends with "{asset1_unit_name}-{asset2_unit_name}"
@@ -1061,10 +1087,10 @@ bootstrap:
     concat
 
     pushbytes "ALGO"
-    load 1
+    load 102
     bz bootstrap__1
     pop
-    int 1
+    load 102
     asset_params_get AssetUnitName
     assert // Note: This will fail if the asset has no unit name
     // asset2_unit_name on stack
