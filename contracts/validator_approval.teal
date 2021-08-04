@@ -1082,7 +1082,7 @@ bootstrap:
 
     // Ensure that the AssetName of the liquidity asset ends with "{asset1_unit_name}-{asset2_unit_name}"
     // The Pool LogicSig ensures that it starts with "Tinyman Pool "
-    int 0
+    load 101
     asset_params_get AssetUnitName
     assert // Note: This will fail if the asset has no unit name
     // asset1_unit_name on stack
