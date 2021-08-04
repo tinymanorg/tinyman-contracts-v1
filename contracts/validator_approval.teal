@@ -864,30 +864,31 @@ swap:
     // k = input_supply * output_supply
     // calculated_amount_in = (k / (output_supply - asset_out_amount)) - input_supply
     // calculated_amount_in_with_fee = calculated_amount_in * 1000/997
+    // This can be rewritten to reduce precision loss with integer division:
+    // calculated_amount_in = ((asset_out_amount * 1000 * input_suppply) / ((output_supply - asset_out_amount) * 997)) + 1
 
+    load 53 // gtxn_3_amount: asset_out_amount
+    int 1000
+    *
     load 18 // input_supply
-    load 19 // output_supply
-    mulw // k
-
+    mulw // (asset_out_amount * 1000 * input_suppply)
+    
     load 19 // output_supply
     load 53 // gtxn_3_amount: asset_out_amount
     -
-    int 1
-    mulw
+    int 997
+    mulw // ((output_supply - asset_out_amount) * 997))
+
     divmodw
     pop
     pop
     swap
     pop
     // only low quotient remains on stack
-    // (k / (output_supply - asset_out_amount))
-    load 18 // input_supply
-    - // (k / (output_supply - asset_out_amount)) - input_supply
-    int 997
-    /
-    int 1000
-    * // calculated_amount_in_with_fee = calculated_amount_in * 1000/997
-
+    // ((asset_out_amount * 1000 * input_suppply) / ((output_supply - asset_out_amount) * 997))
+    int 1
+    +
+    // calculated_amount_in = ((asset_out_amount * 1000 * input_suppply) / ((output_supply - asset_out_amount) * 997)) + 1
     dup
     store 21 // calculated_amount_in
     
@@ -946,31 +947,33 @@ swap__fi:
     // k = input_supply * output_supply
     // asset_in_amount_minus_fee = asset_in_amount * 997/1000
     // calculated_amount_out = output_supply - (k / (input_supply + asset_in_amount_minus_fee))
-
-    load 19 // output_supply
-
-    load 18 // input_supply
-    load 19 // output_supply
-    mulw // k
-
-    load 18 // input_supply
+    // This can be rewritten to reduce precision loss with integer division:
+    //  calculated_amount_out = (asset_in_amount * 997 * output_supply) / ((input_supply * 1000) + (asset_in_amount * 997))
 
     load 52 // gtxn_2_amount: asset_in_amount
     dup
     store 21 // calculated_amount_in == asset_in_amount 
     int 997
-    * // asset_in_amount * 997
+    *
+    load 19 // output_supply
+    mulw // (asset_in_amount * 997 * output_supply)
+
+    load 18 // input_supply
     int 1000
-    / // asset_in_amount_minus_fee
-    addw // (input_supply + asset_in_amount_minus_fee)
+    *
+
+    load 52 // gtxn_2_amount: asset_in_amount
+    int 997
+    *
+    addw // ((input_supply * 1000) + (asset_in_amount * 997))
+
     divmodw
     pop
     pop
     swap
     pop
-    // k / (input_supply + asset_in_amount_minus_fee)
-    - // output_supply - (k / (input_supply + asset_in_amount_minus_fee))
-
+    // only low quotient remains on stack
+    // calculated_amount_out = (asset_in_amount * 997 * output_supply) / ((input_supply * 1000) + (asset_in_amount * 997))
     dup
     store 20 // calculated_amount_out
     // ensure calculated_amount_out > 0
