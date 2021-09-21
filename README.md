@@ -3,13 +3,15 @@ Tinyman AMM Contracts V1
 
 Tinyman is an automated market maker (AMM) implementation on Algorand.
 
-**NOTE: These contracts are not final and must not be deployed to Mainnet. An audit report by Runtime Verification will be published here before the Mainnet launch.**
 
 ### Docs
 
 Docs describing the transactions for each operation are located in the [docs](docs/) folder.
 
 Further documentation is available at [docs.tinyman.org](https://docs.tinyman.org)
+
+### Audit
+An audit of these contracts has been completed by [Runtime Verification](https://runtimeverification.com/). It can be found in [their Github repo](https://github.com/runtimeverification/publications/blob/main/reports/smart-contracts/Tinyman.pdf).
 
 
 ### Acknowledgements
