@@ -397,7 +397,12 @@ mint:
     assert
 
     // ensure asset id is asset 2
-    gtxn 3 XferAsset // 0 if Algo Pay txn
+    gtxn 3 XferAsset
+    int 0
+    gtxn 3 TypeEnum
+    int pay
+    == // check if Algo
+    select
     int TMPL_ASSET_ID_2
     ==
     assert
@@ -523,7 +528,12 @@ burn:
     assert
 
     // ensure asset id is asset 2
-    gtxn 3 XferAsset // 0 if Algo Pay txn
+    gtxn 3 XferAsset
+    int 0
+    gtxn 3 TypeEnum
+    int pay
+    == // check if Algo
+    select
     int TMPL_ASSET_ID_2
     ==
     assert
