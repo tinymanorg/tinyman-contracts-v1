@@ -361,9 +361,15 @@ swap_mint_burn:
     //  * cumulative_price2 (c2)
     //  * last_updated_timestamp (t)
     //
-    // cumulative_price1 and cumulative_price2 accumulate the price * 10e6
+    // cumulative_price1 and cumulative_price2 accumulate the price scaled by 1e6
     // They are uint64s and wrap around by design
-    // Recorded prices in state (p1, p2) from the previous swap/mint/burn are used
+    // Recorded scaled prices in state (p1, p2) from the previous swap/mint/burn are used
+    // p1 is (asset2_supply/asset1_supply) * 1e6
+    // p2 is (asset2_supply/asset1_supply) * 1e6
+    // time_delta is (LatestTimestamp - last_updated_timestamp)
+
+    // If (p1 * time_delta) > 0xffffffffffffffff we can't record a cumulative price.
+    // In this case we skip the update of c1, c2, t.
 
     global LatestTimestamp
     int 0
@@ -381,13 +387,19 @@ swap_mint_burn:
     // cumulative_price1 = cumulative_price1 + (price1 * time_delta)
     int 0
     byte "c1"
-    dup2
     app_local_get // cumulative_price1
     int 0
     byte "p1"
     app_local_get // price1
     load 250 // time_delta
-    * // multiply by time_delta
+    mulw 
+    // high
+    // low
+    swap 
+    // low
+    // high
+    // if high > 0 then (price1 * time_delta) is > uint64. skip the oracle update in this case
+    bnz skip_oracle_update
     // (price1 * time_delta) on stack
     // now calculate: (cumulative_price1 + (price1 * time_delta)) % (MAX_UINT64 + 1)
     addw
@@ -399,21 +411,23 @@ swap_mint_burn:
     pop
     pop
     pop
-    load 251
-    // cumulative_price1 + (price1 * time_delta)
-    app_local_put // cumulative_price1
-
 
     // cumulative_price2 = cumulative_price2 + (price2 * time_delta)
     int 0
     byte "c2"
-    dup2
     app_local_get // cumulative_price2
     int 0
     byte "p2"
     app_local_get // price2
     load 250 // time_delta
-    * // multiply by time_delta
+    mulw 
+    // high
+    // low
+    swap 
+    // low
+    // high
+    // if high > 0 then (price2 * time_delta) is > uint64. skip the oracle update in this case
+    bnz skip_oracle_update
     // (price2 * time_delta) on stack
     // now calculate: (cumulative_price2 + (price2 * time_delta)) % (MAX_UINT64 + 1)
     addw
@@ -421,14 +435,21 @@ swap_mint_burn:
     int 1
     addw
     divmodw
-    store 251
+    store 252
     pop
     pop
     pop
-    load 251
-    // cumulative_price2 + (price2 * time_delta)
-    app_local_put // cumulative_price2
+    
 
+    int 0
+    byte "c1"
+    load 251
+    app_local_put // cumulative_price1
+
+    int 0
+    byte "c2"
+    load 252
+    app_local_put // cumulative_price2
 
     int 0
     byte "t"
