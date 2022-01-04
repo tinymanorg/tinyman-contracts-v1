@@ -329,9 +329,11 @@ mint:
     // 	gtxn 2 Sender (Pooler) != txn Sender (Pool)
     // 	gtxn 2 AssetReceiver (Pool) == txn Sender (Pool)
     // 	gtxn 2 Sender (Pooler) == gtxn 3 Sender (Pooler)
+    //  gtxn 2 XferAsset == TMPL_ASSET_ID_1
 
     // 	# from Pooler to Pool asset 2
     // 	txn Sender (Pool) == (gtxn 3 AssetReceiver or gtxn 3 Receiver) (Pool)
+    //  gtxn 3 XferAsset == TMPL_ASSET_ID_2
 
 
     // 	# from Pool to Pooler liquidity token
@@ -377,6 +379,12 @@ mint:
     ==
     assert
 
+    // ensure asset id is asset 1
+    gtxn 2 XferAsset
+    int TMPL_ASSET_ID_1
+    ==
+    assert
+
     // verify txn 3 is AssetTransfer from Pooler to Pool
     gtxn 3 AssetReceiver
     gtxn 3 Receiver
@@ -385,6 +393,17 @@ mint:
     == // check if Algo
     select
     txn Sender
+    ==
+    assert
+
+    // ensure asset id is asset 2
+    gtxn 3 XferAsset
+    int 0
+    gtxn 3 TypeEnum
+    int pay
+    == // check if Algo
+    select
+    int TMPL_ASSET_ID_2
     ==
     assert
 
@@ -430,10 +449,12 @@ burn:
     // # from Pool to Pooler asset 1
     // gtxn 2 Sender (Pooler) == txn Sender (Pool)
     // gtxn 2 AssetReceiver (Pool) == gtxn 4 Sender (Pool)
-    // gtxn 3 Sender (Pool) == txn Sender (Pool)
+    // gtxn 2 XferAsset == TMPL_ASSET_ID_1
 
     // # from Pool to Pooler asset 2
+    // gtxn 3 Sender (Pool) == txn Sender (Pool)
     // gtxn 4 Sender (Pooler) == (gtxn 3 AssetReceiver or gtxn 3 Receiver) (Pool)
+    // gtxn 3 XferAsset == TMPL_ASSET_ID_2
 
 
     // # from Pooler to Pool liquidity token
@@ -483,12 +504,19 @@ burn:
     ==
     assert
 
+    // ensure asset id is asset 1
+    gtxn 2 XferAsset
+    int TMPL_ASSET_ID_1
+    ==
+    assert
+
+
+     // 3: AssetTransfer - from Pool to Pooler asset 2
     gtxn 3 Sender
     txn Sender
     ==
     assert
 
-    // 3: AssetTransfer - from Pool to Pooler asset 2
     gtxn 3 AssetReceiver
     gtxn 3 Receiver
     gtxn 3 TypeEnum
@@ -496,6 +524,17 @@ burn:
     == // if algo
     select
     gtxn 4 Sender
+    ==
+    assert
+
+    // ensure asset id is asset 2
+    gtxn 3 XferAsset
+    int 0
+    gtxn 3 TypeEnum
+    int pay
+    == // check if Algo
+    select
+    int TMPL_ASSET_ID_2
     ==
     assert
 
