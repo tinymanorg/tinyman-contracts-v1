@@ -1081,7 +1081,7 @@ bootstrap:
     app_local_put // asset2ID
 
     // Ensure that the AssetName of the liquidity asset ends with "{asset1_unit_name}-{asset2_unit_name}"
-    // The Pool LogicSig ensures that it starts with "Tinyman Pool "
+    // The Pool LogicSig ensures that it starts with "TinymanPool1.1 "
     load 101
     asset_params_get AssetUnitName
     assert // Note: This will fail if the asset has no unit name
@@ -1103,7 +1103,7 @@ bootstrap:
     gtxn 2 ConfigAssetName
     dup
     len
-    int 13
+    int 15
     swap
     substring3
     ==

@@ -180,17 +180,17 @@ bootstrap:
     ==
     assert
 
-    // ensure unit name is 'TM1POOL'
+    // ensure unit name is 'TMPOOL11'
     gtxn 2 ConfigAssetUnitName
-    byte "TM1POOL"
+    byte "TMPOOL11"
     ==
     assert
 
-    // ensure asset name begins with 'Tinyman Pool '
+    // ensure asset name begins with 'TinymanPool1.1 '
     // the Validator app ensures the name ends with "{asset1_unit_name}-{asset2_unit_name}"
     gtxn 2 ConfigAssetName
-    substring 0 13
-    byte "Tinyman Pool "
+    substring 0 15
+    byte "TinymanPool1.1 "
     ==
     assert
 
