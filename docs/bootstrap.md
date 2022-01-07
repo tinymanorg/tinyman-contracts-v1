@@ -48,8 +48,8 @@ Setup a Pool for a pair of assets. The Pool account should be a LogicSig contrac
     "snd": "{POOL_ADDRESS}",
     "fee": 1000,
     "apar": {
-      "an": "Tinyman Pool USDC-ALGO",
-      "un": "TM1POOL"
+      "an": "TinymanPool1.1 USDC-ALGO",
+      "un": "TMPOOL11"
       "au": "https://tinyman.org",
       "t": 18446744073709551615, // 0xFFFFFFFFFFFFFFFF
       "dc": 6,
