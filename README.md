@@ -10,6 +10,12 @@ Docs describing the transactions for each operation are located in the [docs](do
 
 Further documentation is available at [docs.tinyman.org](https://docs.tinyman.org)
 
+### Bug Bounty Program
+Please see details in the blog post announcing the program:
+https://tinymanorg.medium.com/tinyman-bug-bounty-campaign-b6c5e1ba7d6c
+
+Reports of potential flaws must be responsibly disclosed to `security@tinyman.org`. Do not share details with anyone else until notified to do so by the team.
+
 ### Audit
 An audit of these contracts has been completed by [Runtime Verification](https://runtimeverification.com/). It can be found in [their Github repo](https://github.com/runtimeverification/publications/blob/main/reports/smart-contracts/Tinyman.pdf).
 
