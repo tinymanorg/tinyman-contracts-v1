@@ -1,5 +1,5 @@
-# tinyman-contracts-v1
-Tinyman AMM Contracts V1
+# tinyman-contracts-v1.1
+Tinyman AMM Contracts V1.1
 
 Tinyman is an automated market maker (AMM) implementation on Algorand.
 
