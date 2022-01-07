@@ -14,6 +14,10 @@ Further documentation is available at [docs.tinyman.org](https://docs.tinyman.or
 An audit of these contracts has been completed by [Runtime Verification](https://runtimeverification.com/). It can be found in [their Github repo](https://github.com/runtimeverification/publications/blob/main/reports/smart-contracts/Tinyman.pdf).
 
 
+### Internal Review
+The Tinyman team conducted an internal review of the V1.1 contracts in January 2022. This is published in this repo [here](Tinyman_AMM_Contracts_V1-1_Internal_Review.pdf).
+
+
 ### Acknowledgements
 The Tinyman team would like to thank [@jasonpaulos](https://github.com/jasonpaulos) for his help and guidance with the initial design and development of the Tinyman AMM contracts.
 
