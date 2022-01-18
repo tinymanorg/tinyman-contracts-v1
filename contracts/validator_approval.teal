@@ -312,6 +312,16 @@ redeem_fees:
 
 // Redeem
 redeem:
+    // ensure Accounts[1] is the Pooler/Swapper (receiver of txn 2)
+    gtxn 2 AssetReceiver
+    gtxn 2 Receiver
+    gtxn 2 TypeEnum
+    int pay
+    == // if algo
+    select
+    txna Accounts 1
+    ==
+    assert
     // ensure redeeming amount > 0
     load 52 // gtxn_2_amount
     assert
@@ -531,6 +541,12 @@ mint_burn__1:
 // excess_asset2_amount += excess_asset_2
 
 // burn
+    // ensure Accounts[1] is the Pooler (sender of txn 4)
+    txna Accounts 1
+    gtxn 4 Sender
+    ==
+    assert
+
     gtxn 4 AssetAmount // burn_amount
     load 71 // asset1_supply
     mulw // burn_amount * asset1_supply
@@ -622,6 +638,12 @@ mint_burn__1:
 // put excess_liquidity_token_amount += excess_liquidity_token
 
 mint:
+    // ensure Accounts[1] is the Pooler (sender of txn 2)
+    txna Accounts 1
+    gtxn 2 Sender
+    ==
+    assert
+
     load 71 // asset1_supply
     load 52 // gtxn_2_amount
     +
@@ -833,6 +855,12 @@ mint:
 
 
 swap:
+    // ensure Accounts[1] is the Swapper (sender of txn 2)
+    txna Accounts 1
+    gtxn 2 Sender
+    ==
+    assert
+
     // Is asset_in == asset1 and asset_out == asset2? 
     gtxn 2 XferAsset
     load 101 // asset1_id
